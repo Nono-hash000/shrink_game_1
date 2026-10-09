@@ -44,24 +44,41 @@
             const C_RED = 'rgb(255, 60, 90)';
             const C_WHITE = 'rgb(255,255,255)';
 
+            let state = 'start'; // 'start' | 'playing' | 'gameover'
             let py = H - BOUND - SIZE, vy = 0, g = 0.6, score = 0, best = 0;
             let obstacles = [], particles = [], trail = [], timer = 60;
 
-            function flip() {
-                g = -g;
-                vy = g * 2;
+            function resetGame() {
+                score = 0;
+                obstacles = [];
+                particles = [];
+                trail = [];
+                timer = 50;
+                g = 0.6;
+                vy = 0;
+                py = H - BOUND - SIZE;
+                state = 'playing';
+            }
+
+            function handleInput() {
+                if (state === 'start' || state === 'gameover') {
+                    resetGame();
+                } else if (state === 'playing') {
+                    g = -g;
+                    vy = g * 2;
+                }
             }
 
             window.addEventListener('keydown', e => {
                 if (e.code === 'Space') {
-                    flip();
+                    handleInput();
                     e.preventDefault();
                 }
             });
-            window.addEventListener('pointerdown', flip);
+            window.addEventListener('pointerdown', handleInput);
 
             function crash() {
-                for (let i = 0; i < 24; i++) {
+                for (let i = 0; i < 30; i++) {
                     const a = Math.random() * 6.28;
                     const s = Math.random() * 7 + 2;
                     particles.push({
@@ -75,13 +92,21 @@
                     });
                 }
                 if (score > best) best = score;
-                score = 0;
-                obstacles = [];
-                timer = 50;
-                py = g > 0 ? H - BOUND - SIZE : BOUND;
+                state = 'gameover';
             }
 
             function update() {
+                // Keep particles animating even on gameover screen
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.a -= 0.02;
+                    if (p.a <= 0) particles.splice(i, 1);
+                }
+
+                if (state !== 'playing') return;
+
                 vy += g;
                 py += vy;
                 if (py <= BOUND) {
@@ -110,6 +135,7 @@
                     });
                     timer = Math.max(40, 75 - Math.floor(score / 500));
                 }
+
                 for (let i = obstacles.length - 1; i >= 0; i--) {
                     const o = obstacles[i];
                     o.x -= spd;
@@ -124,20 +150,13 @@
                     }
                     if (o.x + o.w < 0) obstacles.splice(i, 1);
                 }
-
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    const p = particles[i];
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.a -= 0.03;
-                    if (p.a <= 0) particles.splice(i, 1);
-                }
             }
 
             function draw() {
                 ctx.fillStyle = C_BG;
                 ctx.fillRect(0, 0, W, H);
 
+                // Grid background
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
                 const off = (score * 3) % 40;
                 for (let x = -off; x < W; x += 40) {
@@ -147,6 +166,7 @@
                     ctx.stroke();
                 }
 
+                // Boundaries
                 ctx.fillStyle = 'rgb(22, 28, 44)';
                 ctx.fillRect(0, 0, W, BOUND);
                 ctx.fillRect(0, H - BOUND, W, BOUND);
@@ -156,6 +176,7 @@
                 ctx.fillStyle = 'rgb(255, 50, 120)';
                 ctx.fillRect(0, H - BOUND, W, 2);
 
+                // Obstacles
                 for (const o of obstacles) {
                     ctx.fillStyle = C_RED;
                     ctx.fillRect(o.x, o.y, o.w, o.h);
@@ -163,26 +184,31 @@
                     ctx.fillRect(o.x + 2, o.y + 2, o.w - 4, o.h - 4);
                 }
 
-                for (const t of trail) {
-                    if (t.a > 0) {
-                        ctx.fillStyle = 'rgba(0, 240, 255, ' + t.a + ')';
-                        ctx.fillRect(PX, t.y, SIZE, SIZE);
+                // Trail & Player
+                if (state !== 'gameover') {
+                    for (const t of trail) {
+                        if (t.a > 0) {
+                            ctx.fillStyle = 'rgba(0, 240, 255, ' + t.a + ')';
+                            ctx.fillRect(PX, t.y, SIZE, SIZE);
+                        }
                     }
+
+                    ctx.fillStyle = C_CYAN;
+                    ctx.fillRect(PX, py, SIZE, SIZE);
+                    ctx.fillStyle = C_WHITE;
+                    ctx.fillRect(PX + 3, py + 3, SIZE - 6, SIZE - 6);
+
+                    // Direction indicator arrow
+                    ctx.fillStyle = C_BG;
+                    ctx.beginPath();
+                    const cy = py + SIZE / 2, d = g > 0 ? 1 : -1;
+                    ctx.moveTo(PX + SIZE / 2, cy + d * 5);
+                    ctx.lineTo(PX + SIZE / 2 - 4, cy - d * 3);
+                    ctx.lineTo(PX + SIZE / 2 + 4, cy - d * 3);
+                    ctx.fill();
                 }
 
-                ctx.fillStyle = C_CYAN;
-                ctx.fillRect(PX, py, SIZE, SIZE);
-                ctx.fillStyle = C_WHITE;
-                ctx.fillRect(PX + 3, py + 3, SIZE - 6, SIZE - 6);
-
-                ctx.fillStyle = C_BG;
-                ctx.beginPath();
-                const cy = py + SIZE / 2, d = g > 0 ? 1 : -1;
-                ctx.moveTo(PX + SIZE / 2, cy + d * 5);
-                ctx.lineTo(PX + SIZE / 2 - 4, cy - d * 3);
-                ctx.lineTo(PX + SIZE / 2 + 4, cy - d * 3);
-                ctx.fill();
-
+                // Explosion particles
                 for (const p of particles) {
                     ctx.fillStyle = p.col;
                     ctx.globalAlpha = Math.max(0, p.a);
@@ -190,19 +216,44 @@
                 }
                 ctx.globalAlpha = 1;
 
+                // HUD
                 ctx.fillStyle = C_WHITE;
                 ctx.font = 'bold 15px monospace';
+                ctx.textAlign = 'left';
                 ctx.fillText('SCORE: ' + score, 20, 20);
                 ctx.fillStyle = 'rgb(255, 255, 0)';
                 ctx.fillText('BEST: ' + Math.max(score, best), W - 130, 20);
 
-                if (score < 90) {
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                // Overlay screens
+                ctx.textAlign = 'center';
+                if (state === 'start') {
+                    ctx.fillStyle = 'rgba(10, 12, 22, 0.7)';
+                    ctx.fillRect(0, 0, W, H);
+
+                    ctx.fillStyle = C_CYAN;
+                    ctx.font = 'bold 28px monospace';
+                    ctx.fillText('GRAV-FLIP', W / 2, H / 2 - 20);
+
+                    ctx.fillStyle = C_WHITE;
                     ctx.font = '14px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('CLICK OR SPACE TO FLIP', W / 2, H / 2);
-                    ctx.textAlign = 'start';
+                    ctx.fillText('PRESS SPACE OR CLICK TO START', W / 2, H / 2 + 20);
+                } else if (state === 'gameover') {
+                    ctx.fillStyle = 'rgba(10, 12, 22, 0.75)';
+                    ctx.fillRect(0, 0, W, H);
+
+                    ctx.fillStyle = C_RED;
+                    ctx.font = 'bold 28px monospace';
+                    ctx.fillText('CRASHED!', W / 2, H / 2 - 35);
+
+                    ctx.fillStyle = C_WHITE;
+                    ctx.font = '16px monospace';
+                    ctx.fillText('FINAL SCORE: ' + score, W / 2, H / 2 + 5);
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.font = '13px monospace';
+                    ctx.fillText('PRESS SPACE OR CLICK TO RESTART', W / 2, H / 2 + 40);
                 }
+                ctx.textAlign = 'left';
             }
 
             function loop() {
