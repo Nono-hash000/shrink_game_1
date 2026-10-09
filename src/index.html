@@ -44,7 +44,7 @@
             const C_RED = 'rgb(255, 60, 90)';
             const C_WHITE = 'rgb(255,255,255)';
 
-            let state = 'start'; // 'start' | 'playing' | 'gameover'
+            let state = 'start';
             let py = H - BOUND - SIZE, vy = 0, g = 0.6, score = 0, best = 0;
             let obstacles = [], particles = [], trail = [], timer = 60;
 
@@ -96,7 +96,6 @@
             }
 
             function update() {
-                // Keep particles animating even on gameover screen
                 for (let i = particles.length - 1; i >= 0; i--) {
                     const p = particles[i];
                     p.x += p.vx;
@@ -156,7 +155,6 @@
                 ctx.fillStyle = C_BG;
                 ctx.fillRect(0, 0, W, H);
 
-                // Grid background
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
                 const off = (score * 3) % 40;
                 for (let x = -off; x < W; x += 40) {
@@ -166,7 +164,6 @@
                     ctx.stroke();
                 }
 
-                // Boundaries
                 ctx.fillStyle = 'rgb(22, 28, 44)';
                 ctx.fillRect(0, 0, W, BOUND);
                 ctx.fillRect(0, H - BOUND, W, BOUND);
@@ -176,7 +173,6 @@
                 ctx.fillStyle = 'rgb(255, 50, 120)';
                 ctx.fillRect(0, H - BOUND, W, 2);
 
-                // Obstacles
                 for (const o of obstacles) {
                     ctx.fillStyle = C_RED;
                     ctx.fillRect(o.x, o.y, o.w, o.h);
@@ -184,7 +180,6 @@
                     ctx.fillRect(o.x + 2, o.y + 2, o.w - 4, o.h - 4);
                 }
 
-                // Trail & Player
                 if (state !== 'gameover') {
                     for (const t of trail) {
                         if (t.a > 0) {
@@ -198,7 +193,6 @@
                     ctx.fillStyle = C_WHITE;
                     ctx.fillRect(PX + 3, py + 3, SIZE - 6, SIZE - 6);
 
-                    // Direction indicator arrow
                     ctx.fillStyle = C_BG;
                     ctx.beginPath();
                     const cy = py + SIZE / 2, d = g > 0 ? 1 : -1;
@@ -208,7 +202,6 @@
                     ctx.fill();
                 }
 
-                // Explosion particles
                 for (const p of particles) {
                     ctx.fillStyle = p.col;
                     ctx.globalAlpha = Math.max(0, p.a);
@@ -216,7 +209,6 @@
                 }
                 ctx.globalAlpha = 1;
 
-                // HUD
                 ctx.fillStyle = C_WHITE;
                 ctx.font = 'bold 15px monospace';
                 ctx.textAlign = 'left';
@@ -224,7 +216,6 @@
                 ctx.fillStyle = 'rgb(255, 255, 0)';
                 ctx.fillText('BEST: ' + Math.max(score, best), W - 130, 20);
 
-                // Overlay screens
                 ctx.textAlign = 'center';
                 if (state === 'start') {
                     ctx.fillStyle = 'rgba(10, 12, 22, 0.7)';
