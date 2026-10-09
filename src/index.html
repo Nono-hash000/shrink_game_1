@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grav-Flip</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: rgb(10, 12, 22);
+            color: rgb(240, 240, 255);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: monospace;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            background: rgb(14, 18, 30);
+            border: 2px solid rgb(50, 40, 75);
+            box-shadow: 0 0 35px rgba(0, 0, 0, 0.7);
+            max-width: 95vw;
+            max-height: 90vh;
+            aspect-ratio: 2 / 1;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="800" height="400"></canvas>
+    <script>
+        (() => {
+            const canvas = document.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+            const W = 800, H = 400, BOUND = 30, SIZE = 22, PX = 100;
+            const C_BG = 'rgb(14,18,30)';
+            const C_CYAN = 'rgb(0,240,255)';
+            const C_RED = 'rgb(255, 60, 90)';
+            const C_WHITE = 'rgb(255,255,255)';
+
+            let py = H - BOUND - SIZE, vy = 0, g = 0.6, score = 0, best = 0;
+            let obstacles = [], particles = [], trail = [], timer = 60;
+
+            function flip() {
+                g = -g;
+                vy = g * 2;
+            }
+
+            window.addEventListener('keydown', e => {
+                if (e.code === 'Space') {
+                    flip();
+                    e.preventDefault();
+                }
+            });
+            window.addEventListener('pointerdown', flip);
+
+            function crash() {
+                for (let i = 0; i < 24; i++) {
+                    const a = Math.random() * 6.28;
+                    const s = Math.random() * 7 + 2;
+                    particles.push({
+                        x: PX + SIZE / 2,
+                        y: py + SIZE / 2,
+                        vx: Math.cos(a) * s,
+                        vy: Math.sin(a) * s,
+                        sz: Math.random() * 4 + 2,
+                        a: 1,
+                        col: Math.random() < 0.5 ? C_RED : C_CYAN
+                    });
+                }
+                if (score > best) best = score;
+                score = 0;
+                obstacles = [];
+                timer = 50;
+                py = g > 0 ? H - BOUND - SIZE : BOUND;
+            }
+
+            function update() {
+                vy += g;
+                py += vy;
+                if (py <= BOUND) {
+                    py = BOUND;
+                    vy = 0;
+                } else if (py >= H - BOUND - SIZE) {
+                    py = H - BOUND - SIZE;
+                    vy = 0;
+                }
+                score++;
+
+                trail.push({ y: py, a: 0.6 });
+                if (trail.length > 6) trail.shift();
+                for (const t of trail) t.a -= 0.1;
+
+                const spd = 5 + Math.min(score * 0.001, 4);
+                if (--timer <= 0) {
+                    const isCeil = Math.random() < 0.5;
+                    const h = Math.random() * 110 + 40;
+                    const w = Math.random() * 20 + 25;
+                    obstacles.push({
+                        x: W,
+                        y: isCeil ? BOUND : H - BOUND - h,
+                        w,
+                        h
+                    });
+                    timer = Math.max(40, 75 - Math.floor(score / 500));
+                }
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    const o = obstacles[i];
+                    o.x -= spd;
+                    if (
+                        PX < o.x + o.w &&
+                        PX + SIZE > o.x &&
+                        py < o.y + o.h &&
+                        py + SIZE > o.y
+                    ) {
+                        crash();
+                        break;
+                    }
+                    if (o.x + o.w < 0) obstacles.splice(i, 1);
+                }
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.a -= 0.03;
+                    if (p.a <= 0) particles.splice(i, 1);
+                }
+            }
+
+            function draw() {
+                ctx.fillStyle = C_BG;
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+                const off = (score * 3) % 40;
+                for (let x = -off; x < W; x += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, BOUND);
+                    ctx.lineTo(x, H - BOUND);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = 'rgb(22, 28, 44)';
+                ctx.fillRect(0, 0, W, BOUND);
+                ctx.fillRect(0, H - BOUND, W, BOUND);
+
+                ctx.fillStyle = C_CYAN;
+                ctx.fillRect(0, BOUND - 2, W, 2);
+                ctx.fillStyle = 'rgb(255, 50, 120)';
+                ctx.fillRect(0, H - BOUND, W, 2);
+
+                for (const o of obstacles) {
+                    ctx.fillStyle = C_RED;
+                    ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.fillStyle = 'rgba(255, 140, 160)';
+                    ctx.fillRect(o.x + 2, o.y + 2, o.w - 4, o.h - 4);
+                }
+
+                for (const t of trail) {
+                    if (t.a > 0) {
+                        ctx.fillStyle = 'rgba(0, 240, 255, ' + t.a + ')';
+                        ctx.fillRect(PX, t.y, SIZE, SIZE);
+                    }
+                }
+
+                ctx.fillStyle = C_CYAN;
+                ctx.fillRect(PX, py, SIZE, SIZE);
+                ctx.fillStyle = C_WHITE;
+                ctx.fillRect(PX + 3, py + 3, SIZE - 6, SIZE - 6);
+
+                ctx.fillStyle = C_BG;
+                ctx.beginPath();
+                const cy = py + SIZE / 2, d = g > 0 ? 1 : -1;
+                ctx.moveTo(PX + SIZE / 2, cy + d * 5);
+                ctx.lineTo(PX + SIZE / 2 - 4, cy - d * 3);
+                ctx.lineTo(PX + SIZE / 2 + 4, cy - d * 3);
+                ctx.fill();
+
+                for (const p of particles) {
+                    ctx.fillStyle = p.col;
+                    ctx.globalAlpha = Math.max(0, p.a);
+                    ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+                }
+                ctx.globalAlpha = 1;
+
+                ctx.fillStyle = C_WHITE;
+                ctx.font = 'bold 15px monospace';
+                ctx.fillText('SCORE: ' + score, 20, 20);
+                ctx.fillStyle = 'rgb(255, 255, 0)';
+                ctx.fillText('BEST: ' + Math.max(score, best), W - 130, 20);
+
+                if (score < 90) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.font = '14px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('CLICK OR SPACE TO FLIP', W / 2, H / 2);
+                    ctx.textAlign = 'start';
+                }
+            }
+
+            function loop() {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            requestAnimationFrame(loop);
+        })();
+    </script>
+</body>
+</html>
